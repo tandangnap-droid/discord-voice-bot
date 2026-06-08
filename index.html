@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>Discord Voice Bot - Hệ thống Đăng nhập</title>
+    <title>Discord Voice & RPC Bot - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes splash-orbit {
@@ -24,9 +24,7 @@
     </style>
 </head>
 <body class="antialiased bg-[#0b0d10] text-white font-sans">
-
     <div class="h-screen w-full flex flex-col items-center justify-center relative overflow-hidden p-4">
-        
         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-[#5865F2]/10 rounded-full blur-[120px] pointer-events-none"></div>
         <div class="absolute top-1/3 left-1/3 w-[200px] h-[200px] bg-[#EB459E]/6 rounded-full blur-[80px] pointer-events-none"></div>
 
@@ -43,8 +41,7 @@
             <div class="w-full space-y-4">
                 <div>
                     <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Nhập Token Discord</label>
-                    <input type="password" id="login-token" placeholder="Mfa.v2.xxxx..." 
-                           class="w-full px-4 py-3 bg-[#0b0d10] border border-zinc-800 rounded-xl text-white placeholder-zinc-700 focus:outline-none focus:border-[#5865F2] focus:ring-1 focus:ring-[#5865F2] transition-all text-sm"/>
+                    <input type="password" id="login-token" placeholder="Mfa.v2.xxxx..." class="w-full px-4 py-3 bg-[#0b0d10] border border-zinc-800 rounded-xl text-white placeholder-zinc-700 focus:outline-none focus:border-[#5865F2] focus:ring-1 focus:ring-[#5865F2] transition-all text-sm"/>
                 </div>
                 <button onclick="handleLogin()" id="login-btn" class="w-full py-3 bg-[#5865F2] hover:bg-[#4752c4] text-white font-medium rounded-xl transition-all shadow-lg shadow-[#5865F2]/20 active:scale-[0.98] cursor-pointer text-sm">
                     Đăng Nhập
@@ -54,7 +51,6 @@
         </div>
 
         <div id="dashboard-card" class="hidden relative z-10 w-full max-w-md bg-[#15191e]/80 backdrop-blur-md border border-zinc-800/60 rounded-2xl p-8 shadow-2xl flex flex-col">
-            
             <div class="flex items-center justify-between mb-6 pb-4 border-b border-zinc-800/60">
                 <div class="flex items-center gap-3">
                     <img id="user-avatar" src="https://discord.com/favicon.ico" class="w-10 h-10 rounded-full border border-zinc-700 object-cover bg-zinc-800" alt="Avatar"/>
@@ -71,8 +67,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">ID Kênh Thoại (Voice Channel ID)</label>
-                    <input type="text" id="channelId" placeholder="Nhập ID kênh thoại cần treo..." 
-                           class="w-full px-4 py-3 bg-[#0b0d10] border border-zinc-800 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#5865F2] focus:ring-1 focus:ring-[#5865F2] transition-all text-sm"/>
+                    <input type="text" id="channelId" placeholder="Nhập ID kênh thoại cần treo..." class="w-full px-4 py-3 bg-[#0b0d10] border border-zinc-800 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#5865F2] focus:ring-1 focus:ring-[#5865F2] transition-all text-sm"/>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
@@ -104,9 +99,11 @@
         let globalToken = null;
         let ws = null;
         let heartbeatInterval = null;
+        let rpcInterval = null;
+        let startTime = null;
         const CORS_PROXY = "https://corsproxy.io/?";
+        const STREAM_URL = "https://twitch.tv/tz_016z";
 
-        // 1. KHI VỪA VÀO WEB: Kiểm tra phiên đăng nhập cũ
         window.onload = async function() {
             const savedToken = localStorage.getItem('dc_logged_token');
             const savedChannelId = localStorage.getItem('dc_channelId');
@@ -116,13 +113,11 @@
             }
 
             if (savedToken) {
-                // Hiển thị trạng thái đang kiểm tra tự động
                 document.getElementById('login-btn').innerText = "Đang kiểm tra...";
                 document.getElementById('login-btn').disabled = true;
                 
                 const loginSuccess = await checkAndLogin(savedToken);
                 if (!loginSuccess) {
-                    // Nếu token cũ hỏng, xóa đi bắt đăng nhập lại
                     localStorage.removeItem('dc_logged_token');
                     document.getElementById('login-btn').innerText = "Đăng Nhập";
                     document.getElementById('login-btn').disabled = false;
@@ -130,27 +125,22 @@
             }
         };
 
-        // 2. HÀM CHECK TOKEN QUA DISCORD API VÀ ĐỔI GIAO DIỆN
         async function checkAndLogin(token) {
             const errorDiv = document.getElementById('login-error');
             errorDiv.innerText = "";
 
             try {
-                // Gọi API cá nhân của Discord thông qua Proxy để lấy thông tin Nick
                 const targetUrl = "https://discord.com/api/v9/users/@me";
                 const response = await fetch(CORS_PROXY + encodeURIComponent(targetUrl), {
                     headers: { "Authorization": token.trim() }
                 });
 
                 if (!response.ok) return false;
-
                 const userData = await response.json();
                 globalToken = token.trim();
                 
-                // Lưu Token vào bộ nhớ máy sau khi xác thực thành công
                 localStorage.setItem('dc_logged_token', globalToken);
 
-                // Cập nhật thông tin User lên Dashboard
                 document.getElementById('user-name').innerText = userData.username;
                 if (userData.avatar) {
                     document.getElementById('user-avatar').src = `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`;
@@ -158,7 +148,6 @@
                     document.getElementById('user-avatar').src = `https://cdn.discordapp.com/embed/avatars/${userData.discriminator % 5}.png`;
                 }
 
-                // CHUYỂN GIAO DIỆN: Ẩn Login, Hiện Dashboard
                 document.getElementById('login-card').classList.add('hidden');
                 document.getElementById('dashboard-card').classList.remove('hidden');
                 return true;
@@ -168,7 +157,6 @@
             }
         }
 
-        // 3. NÚT BẤM ĐĂNG NHẬP THỦ CÔNG
         async function handleLogin() {
             const tokenInput = document.getElementById('login-token').value.trim();
             const btn = document.getElementById('login-btn');
@@ -183,7 +171,6 @@
             btn.disabled = true;
 
             const isSuccess = await checkAndLogin(tokenInput);
-
             if (!isSuccess) {
                 errorDiv.innerText = "Token sai hoặc đã hết hạn!";
                 btn.innerText = "Đăng Nhập";
@@ -191,13 +178,11 @@
             }
         }
 
-        // 4. NÚT BẤM ĐĂNG XUẤT
         function handleLogout() {
-            stopBot(); // Tắt kết nối WebSocket nếu đang chạy
+            stopBot();
             localStorage.removeItem('dc_logged_token');
             globalToken = null;
             
-            // Trả về giao diện Login ban đầu
             document.getElementById('login-token').value = "";
             document.getElementById('login-btn').innerText = "Đăng Nhập";
             document.getElementById('login-btn').disabled = false;
@@ -206,7 +191,6 @@
             document.getElementById('login-card').classList.remove('hidden');
         }
 
-        // 5. CẬP NHẬT TRẠNG THÁI ĐÈN TÍN HIỆU TRÊN DASHBOARD
         function updateStatus(text, type = "warning") {
             const statusText = document.getElementById('status');
             const statusDot = document.getElementById('status-dot');
@@ -226,7 +210,49 @@
             }
         }
 
-        // 6. CORE LOGIC: BẬT/TẮT BOT QUA WEBSOCKET (Sử dụng Token đã Đăng nhập)
+        // Hàm tạo cấu trúc dữ liệu Rich Presence của bạn
+        function buildPresenceActivities() {
+            const now = new Date();
+            now.setHours(now.getHours() - 1); // Trừ đi 1 giờ theo logic của bạn
+
+            const time = now.toLocaleTimeString("vi-VN", { hour12: false });
+            const date = now.toLocaleDateString("vi-VN");
+
+            return [{
+                name: "tz_016z",
+                type: 1, // Loại 1: STREAMING
+                url: STREAM_URL,
+                details: `🕒 ${time} • ${date}`,
+                state: "ngu🌸",
+                application_id: "1475505964131155978",
+                timestamps: {
+                    start: startTime - 3600000
+                },
+                assets: {
+                    large_image: "https://media.discordapp.net/attachments/1350812866223018055/1476214658280067095/backClassroom.jpg?ex=69a04f89&is=699efe09&hm=8beda5e4e7edcdd0c60b5a0ffbd718ddc31b70d1d5e035c44bb5e228c6716f8b&=&format=webp&width=822&height=501"
+                },
+                buttons: ["YouTube", "Discord"],
+                metadata: {
+                    button_urls: ["https://youtu.be/dQw4w9WgXcQ", "https://discord.gg/JdGwZS5Xwb"]
+                }
+            }];
+        }
+
+        // Gửi lệnh cập nhật thời gian RPC qua WebSocket
+        function sendPresenceUpdate() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    op: 3, // Status Update payload
+                    d: {
+                        status: "online",
+                        afk: false,
+                        since: null,
+                        activities: buildPresenceActivities()
+                    }
+                }));
+            }
+        }
+
         async function startBot() {
             const channelId = document.getElementById('channelId').value.trim();
 
@@ -236,12 +262,12 @@
             }
 
             if (ws) {
-                updateStatus("Bot đang hoạt động rồi!", "warning");
+                updateStatus("Bot đang chạy sẵn rồi!", "warning");
                 return;
             }
 
             localStorage.setItem('dc_channelId', channelId);
-            updateStatus("Đang kiểm tra phòng thoại...", "warning");
+            updateStatus("Đang xác thực phòng thoại...", "warning");
 
             try {
                 const targetUrl = `https://discord.com/api/v9/channels/${channelId}`;
@@ -249,39 +275,47 @@
                     headers: { "Authorization": globalToken }
                 });
 
-                if (!response.ok) throw new Error("ID Kênh không tồn tại hoặc tài khoản không có quyền vào!");
+                if (!response.ok) throw new Error("ID Kênh không hợp lệ hoặc không có quyền truy cập!");
                 const channelData = await response.json();
                 const guildId = channelData.guild_id;
 
-                updateStatus("Đang mở cổng Gateway kết nối...", "warning");
-
+                updateStatus("Đang mở cổng kết nối Discord...", "warning");
+                startTime = Date.now();
                 ws = new WebSocket("wss://gateway.discord.gg/?v=9&encoding=json");
 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
 
+                    // Nhận tín hiệu Hello từ Gateway
                     if (data.op === 10) {
                         const interval = data.d.heartbeat_interval;
                         heartbeatInterval = setInterval(() => {
                             ws.send(JSON.stringify({ op: 1, d: null }));
                         }, interval);
 
+                        // Gửi payload IDENTIFY (kèm cấu hình RPC ban đầu)
                         ws.send(JSON.stringify({
                             op: 2,
                             d: {
                                 token: globalToken,
                                 capabilities: 16381,
                                 properties: { os: "Windows", browser: "Chrome", device: "" },
-                                presence: { status: "online", afk: false },
+                                presence: {
+                                    status: "online",
+                                    afk: false,
+                                    activities: buildPresenceActivities()
+                                },
                                 compress: false,
                                 client_state: { guild_versions: {}, highest_last_message_id: "0", read_state_version: 0, user_guild_settings_version: -1, user_settings_version: -1, private_channels_version: "0", api_code_version: 0 }
                             }
                         }));
                     }
 
+                    // Khi cổng kết nối READY
                     if (data.t === "READY") {
+                        // Kích hoạt kết nối nhảy vào phòng thoại
                         ws.send(JSON.stringify({
-                            op: 4,
+                            op: 4, // Voice State Update
                             d: {
                                 guild_id: guildId,
                                 channel_id: channelId,
@@ -289,17 +323,21 @@
                                 self_deaf: false
                             }
                         }));
-                        updateStatus(`Đã treo trong phòng [${channelData.name || channelId}]`, "success");
+
+                        // Tạo chu kỳ làm mới thời gian trên khung RPC mỗi 60 giây
+                        rpcInterval = setInterval(sendPresenceUpdate, 60000);
+
+                        updateStatus(`Đã treo [${channelData.name || channelId}] + Phát Streaming RPC`, "success");
                     }
                 };
 
                 ws.onerror = () => {
-                    updateStatus("Lỗi mạng WebSocket!", "error");
+                    updateStatus("Lỗi kết nối mạng WebSocket!", "error");
                     stopBot();
                 };
 
                 ws.onclose = () => {
-                    updateStatus("Đã ngắt kết nối.", "error");
+                    updateStatus("Đã ngắt kết nối hệ thống.", "error");
                     ws = null;
                 };
 
@@ -310,21 +348,26 @@
         }
 
         function stopBot() {
-            updateStatus("Đang tiến hành tắt bot...", "warning");
+            updateStatus("Đang tắt hệ thống bot...", "warning");
 
             if (heartbeatInterval) {
                 clearInterval(heartbeatInterval);
                 heartbeatInterval = null;
             }
+            if (rpcInterval) {
+                clearInterval(rpcInterval);
+                rpcInterval = null;
+            }
 
             if (ws && ws.readyState === WebSocket.OPEN) {
+                // Thoát kênh thoại
                 ws.send(JSON.stringify({
                     op: 4,
                     d: { guild_id: null, channel_id: null, self_mute: true, self_deaf: false }
                 }));
                 setTimeout(() => {
-                    ws.close();
-                    ws = null;
+                    if(ws) { ws.close(); ws = null; }
+                    updateStatus("Đã dừng Bot hoàn toàn!", "error");
                 }, 400);
             } else {
                 ws = null;
